@@ -1,14 +1,17 @@
+/*
+ * @Author: perli 1003914407@qq.com
+ * @Date: 2023-03-15 18:04:17
+ * @LastEditors: perli 1003914407@qq.com
+ * @LastEditTime: 2023-03-15 18:13:06
+ * @FilePath: /nest/admin-server/src/app.module.ts
+ * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
+ */
 import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { UserModule } from './user/user.module';
-import { User1Controller } from './user1/user1.controller';
-import { User2Service } from './user2/user2.service';
-import { User4Module } from './user4/user4.module';
 
 @Module({
-  imports: [UserModule, User4Module],
-  controllers: [AppController, User1Controller],
-  providers: [AppService, User2Service],
+  controllers: [AppController],
+  providers: [AppService],
 })
 export class AppModule {}
