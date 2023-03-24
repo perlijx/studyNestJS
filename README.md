@@ -2,7 +2,7 @@
  * @Author: perli 1003914407@qq.com
  * @Date: 2023-03-13 15:34:51
  * @LastEditors: perli 1003914407@qq.com
- * @LastEditTime: 2023-03-22 14:48:04
+ * @LastEditTime: 2023-03-24 17:21:48
  * @FilePath: /nest/admin-server/README.md
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
 -->
@@ -538,3 +538,152 @@ export class UserService {
 ```
 
 8.  安装mongodb 注意安装版本为 mongodb@^3.6.0
+
+
+### 使用 Winston 实现分级日志记录
+
+##### 日志库的必要性
+
+- 传输通道
+    - Console 文件
+    - File 文件
+    - Http 通过http传输
+    - Stream 流传输
+- 格式化
+    - 时间戳
+    - 格式美化
+- 日志分割
+    - 按文件大小分割
+    - 按写入时间分割
+- 日志分级
+    - `DEBUG`：调试，等级最低，一般生产环境会将该等级的日志关闭
+    - `INFO`：信息，普通等级，最常用的系统日志收集等级，一般会将系统运行中的一些相关信息（非开发类敏感信息）设为该等级
+    - `WARN`：_FBI WARNNING_大家都知道，就是警告，但又不到错误
+    - `ERROR`：报错，一般程序报错使用该等级
+    - `FATAL`：严重，比程序报错还严重的等级，如果没做错误等级划分的话，一般`FATAL`都不怎么用到，都用`ERROR`替代了
+
+
+在nest中使用 Winston
+
+1. 安装winston
+
+```
+pnpm i winston
+```
+
+2. 在/src/shared 中创建logger子模块文件夹创建 logger.service.ts 文件
+
+```ts
+import { Logger, LoggerOptions, transports } from "winston"
+
+export class AppLogger {
+  private logger: Logger
+  private context?: string
+
+  public setContext(context: string):void { //设置上下文
+    this.context = context
+  }
+  constructor() {
+    this.logger = createLogger({  //生成一个logger的工
+      level: process.env.LOGGER_LEVEL || "info", //日志等级
+      format: format.combine( //格式化
+        format.timestamp({ format: "YYYY-MM-DD HH:mm:ss" }), //时间戳
+        format.prettyPrint(), //格式美化
+      ),
+      transports: [
+        new transports.File({ filename: "logs/error.log", level: "error" }), //
+        new transports.File({ filename: "logs/combined.log" }), //传输通道
+        new transports.Console(), //控制台
+      ],
+      
+    })
+  }
+  //日志等级
+  error(ctx:any,message: string, meta?: Record<string, any> ): Logger { //错误
+    return this.logger.error({
+      message,//日志信息
+      contextName: this.context,//上下文
+      ctx, //上下文
+      ...meta,//  
+    })
+  }
+  warn(ctx:any,message: string, meta?: Record<string, any> ): Logger { //警告
+    return this.logger.warn({
+      message,
+      contextName: this.context,
+      ctx,
+      ...meta,
+    })
+  }
+  info(ctx:any,message: string, meta?: Record<string, any> ): Logger { //信息
+        return this.logger.info({
+          message,
+          contextName: this.context,
+          ctx,
+          ...meta,
+        })
+      }
+  debug(ctx:any,message: string, meta?: Record<string, any> ): Logger { //调试
+    return this.logger.debug({
+      message,
+      contextName: this.context,
+      ctx,
+      ...meta,
+    })
+  }
+}
+```
+
+3. 创建logger.module.ts 文件
+
+```ts
+import { Module } from "@nestjs/common"
+import { AppLogger } from "./logger.service"
+
+@Module({
+  providers: [AppLogger],
+  exports: [AppLogger]
+})
+export class AppLoggerModule {}
+```
+
+4. 在shared.module.ts 中注册
+
+```ts
+import { AppLoggerModule } from "./logger/logger.module"
+
+@Module({
+  imports: [AppLoggerModule],
+  exports: [AppLoggerModule],
+})
+```
+
+5. 在需要使用的地方注入
+
+```ts
+
+import { AppLogger } from "../shared/logger/logger.service"
+
+@Injectable()
+export class UserService {
+  constructor(private readonly logger: AppLogger) {
+    this.logger.setContext(UserService.name) //设置上下文
+  }
+  create(createUserDto: CreateUserDto) {
+    this.logger.info( null, "创建用户",{a:123} ) //调用方法
+    this.logger.debug( null, "创建用户",{a:123} ) //调用方法
+    return this.userRepository.save({ //调用方法
+      name:"张三",
+      email:""
+    })
+  }
+  findAll() {
+    this.logger.info("查询用户")
+    this.userRepository.findAndCount({})
+  }
+}
+```
+
+
+
+
