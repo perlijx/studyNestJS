@@ -2,7 +2,7 @@
  * @Author: perli 1003914407@qq.com
  * @Date: 2023-03-13 15:34:51
  * @LastEditors: perli 1003914407@qq.com
- * @LastEditTime: 2023-03-21 18:31:26
+ * @LastEditTime: 2023-03-22 14:48:04
  * @FilePath: /nest/admin-server/README.md
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
 -->
@@ -424,7 +424,8 @@ typeORM 是 一个ORM框架[ORM定义](https://segmentfault.com/a/11900000116425
 1. 安装 typeORM
 
 ```
-pnpm i typeORM
+pnpm i typeorm
+pnpm i mongodb@^3.6.0
 ```
 
 2. 创建数据源
@@ -433,7 +434,7 @@ pnpm i typeORM
 
 ```ts
 import {ConfigService} from "nestjs/config"
-import {DataSource, DataSourceOptions} from "typeORM"
+import {DataSource, DataSourceOptions} from "typeorm"
 import * as path from "path"
 const databaseType: DataSourceOptions["type"] = "mongodb" //配置typeORM实例的类型为mongodb
 // 因为可以配置多个数据源所以DatabaseProvides用数组
@@ -460,11 +461,19 @@ export const DatabaseProvides = [
   }
 ]
 ```
+3. 在shared.module.ts 中注册
+```ts
+import { DatabaseProviders } from "./database.provides"
 
+@Module({
+  exports: [...DatabaseProviders]
+  provides: [...DatabaseProviders]
+})
+```
 
-3. 在要使用mongodb 的模块中创建数据仓库来声明使用了那几个表
+4. 在要使用mongodb 的模块中创建数据仓库来声明使用了那几个表(创建dao层)
 
-> 在/src/user 创建 user.providers.ts 文件
+> 在/src/user 创建 user.providers.ts 文件 给数据表提供资源
 
 ```ts
 //说明可以声明使用很多张表
@@ -478,3 +487,54 @@ export const UserProviders = [
   }
 ]
 ```
+
+5. 在user的module.ts文件中注入刚创建好的UserProviders
+
+```ts
+import {UserProviders} from "./user.providers"
+
+@Module({
+  provide:[...UserProviders]
+})
+```
+
+
+6. 在user/entities 文件中创建 user的mongo实体
+
+```ts
+import { Column, Entity,ObjectIdColumn, ObjectID } from "typeorm"
+@Entity() //声明实体
+export class User {
+  @ObjectIdColumn()    //必须要一个主键
+  _id:ObjectID     
+  @Column("text")
+  name:string
+  @Column({length:200})
+  email: string
+}
+```
+7. 在userService 中使用 
+
+```ts
+import { MongoRepository } from "typeorm"
+import { User } from "./entities/user.mongo.entity"
+InjectTable()
+export class UserService {
+              @Inject("USER_REPOSITORY")
+  constructor(private readonly userRepository: MongoRepository<User>){} //注入了UserProviders 但是UserProviders是数组无法确定引入的是哪个REPOSITORY所以使用 @Inject 描述下使用那个REPOSITORY
+  
+  create(createUserDto: CreateUserDto) {
+    return this.userRepository.save({ //调用方法
+      name:"张三",
+      email:"11@qq.com"
+    })
+  }
+  findAll() {
+    this.userRepository.findAndCount({})
+  } 
+
+
+}
+```
+
+8.  安装mongodb 注意安装版本为 mongodb@^3.6.0

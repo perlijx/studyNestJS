@@ -2,26 +2,34 @@
  * @Author: perli 1003914407@qq.com
  * @Date: 2023-03-16 10:51:51
  * @LastEditors: perli 1003914407@qq.com
- * @LastEditTime: 2023-03-17 16:07:02
+ * @LastEditTime: 2023-03-22 15:17:20
  * @FilePath: /nest/admin-server/src/user/user.service.ts
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
 import { SystemService } from './../shared/system.service';
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-
+import { MongoRepository } from 'typeorm';
+import { User } from './entities/user.entity';
 @Injectable()
 export class UserService {
-  constructor(private readonly SystemService: SystemService) {}
+  constructor(
+    private readonly SystemService: SystemService,
+    @Inject('USER_REPOSITORY')
+    private readonly userRepository: MongoRepository<User>,
+  ) {}
   create(createUserDto: CreateUserDto) {
     console.log(this.SystemService.getEnv());
 
-    return 'This action adds a new user';
+    return this.userRepository.save({
+      name: '张三',
+      email: '11@qq.com',
+    });
   }
 
   findAll() {
-    return `This action returns all user`;
+    return this.userRepository.findAndCount({});
   }
 
   findOne(id: number) {
