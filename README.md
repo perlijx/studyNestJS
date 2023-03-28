@@ -2,7 +2,7 @@
  * @Author: perli 1003914407@qq.com
  * @Date: 2023-03-13 15:34:51
  * @LastEditors: perli 1003914407@qq.com
- * @LastEditTime: 2023-03-24 17:21:48
+ * @LastEditTime: 2023-03-28 10:21:03
  * @FilePath: /nest/admin-server/README.md
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
 -->
@@ -685,5 +685,125 @@ export class UserService {
 ```
 
 
+### 实现分页功能
+
+1. 安装依赖
+
+```
+pnpm i class-transformer class-validator
+```
+
+//class-transformer 用于将对象转换为json对象
+//class-validator 用于验证对象
+
+
+
+2. 分页是一个通用的功能，所以我们在shared文件夹下创建一个dto文件夹，创建一个分页的dto文件
+
+```ts
+import { IsNumber, IsOptional, Min, Transform} from "class-validator" //验证什么类型的数据 IsOptional 可选的 IsNumber 数字类型
+
+export class PaginationParamsDto {
+  @ApiPropertyOptional({  //swagger文档 可选的   @ApiProperty 为必选
+    description: "页码",
+    type: Number, //类型
+    example: 1, //示例  
+  })
+  @IsNumber() //验证是否为数字
+  @IsOptional() //可选的
+  @Min(0) //最小值
+  @Transform(({value}) => parseInt(value, 10)) //转换为数字 Transform 转换器 value => Number(value) 为转换 器 value 为传入的值 Number(value) 为转换后的值  也可以自定义转换器 例如 value => value + 1 为传入的值加1  
+  pageSize = 5
+  @ApiPropertyOptional({  //swagger文档 可选的   @ApiProperty 为必选
+    description: "页码",
+    type: Number, //类型
+    example: 1, //示例  
+  })
+  @IsNumber() //验证是否为数字
+  @IsOptional() //可选的
+  @Min(0) //最小值
+  @Transform(({value}) => parseInt(value, 10)) 
+  page = 1
+} 
+```
+3. 在需要使用的地方引入
+
+```ts
+import { PaginationParamsDto } from "../shared/dto/pagination.dto"
+
+@Get()
+async findAll(@Query() paginationParamsDto: PaginationParamsDto) { //使用 @Query() 获取请求参数
+    const {data, count} = await this.userService.findAll()
+    return {
+      data,
+      meta: {
+        total:{total:count}
+      }
+    }
+ 
+}
+```
+
+3. 修改user.service.ts
+
+```ts 
+import { PaginationParamsDto } from "../shared/dto/pagination.dto"
+class UserService {
+  async findAll({pageSize,page}:PaginationParamsDto) :Promise<{data:User[],count:number}> { //使用解构赋值获取参数
+      const [data, count] = await this.userRepository.findAndCount({
+        order: { name: "DESC" }, //排序 降序
+        take: (pageSize*1), //获取多少条
+        skip: (page - 1) * pageSize, //跳过多少条计算逻辑为 页码-1 * 每页条数 意思是跳过之前的页码的数据
+      })
+      return {data, count}
+    }
+  
+}
+```
+
+
+
+### 实现通用数据项-逻辑删除,时间戳
+
+>在面向对象的编程中公共的属性和方法可以抽象出来，放到父类中，子类继承父类，就可以使用父类的属性和方法，这样就可以减少代码的重复，提高代码的复用性。在面向对象的编程中，我们可以使用抽象类来实现这个功能。
+
+1. 在shared文件夹下创建一个entities文件夹,创建一个common.entity.ts文件
+
+```ts
+import { CreateDateColumn, DeleteDateColumn, UpdateDateColumn,ObjectId,Column ,VersionColumn} from "typeorm"
+
+export abstract class Common {
+  @ObjectIdColumn() //主键
+  _id:ObjectId
+  @CreateDateColumn() //创建时间
+  createAt: Date //创建时间
+  @UpdateDateColumn() //更新时间
+  updateAt: Date //更新时间
+  @Column({
+    default:false, //默认值
+    select:false //查询时不显示
+  })
+  isDelete: boolean //是否删除
+  @VersionColumn({
+    select:false //查询时不显示
+  }) //版本号
+  version:number //版本号
+}
+
+```
+2. 在user.entity.ts 中继承
+
+```ts 
+
+import { Common } from "../shared/entities/common.entity"
+export class User extends Common {
+  @Column()
+  name: string
+  @Column()
+  email: string
+  @Column()
+  password: string
+}
+```
 
 
