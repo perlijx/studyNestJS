@@ -1,14 +1,12 @@
-import { In, Like, Raw, MongoRepository } from 'typeorm';
-import { Injectable, Inject } from '@nestjs/common';
+import { CreateRoleDto } from './../dtos/role.dto';
+import { PaginationParamsDto } from './../../shared/dtos/pagination-params';
+import { MongoRepository } from 'typeorm';
+import { Inject, Injectable } from '@nestjs/common';
 import { Role } from '../entities/role.mongo.entity';
-import { CreateRoleDto } from '../dtos/role.dto';
-import { PaginationParamsDto } from '../../shared/dtos/pagination-params';
-
 @Injectable()
 export class RoleService {
   constructor(
-    @Inject('ROLE_REPOSITORY')
-    private RoleRepository: MongoRepository<Role>,
+    @Inject('ROLE_REPOSITORY') private RoleRepository: MongoRepository<Role>,
   ) {}
 
   create(Role) {

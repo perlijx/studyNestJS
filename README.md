@@ -2,8 +2,8 @@
  * @Author: perli 1003914407@qq.com
  * @Date: 2023-03-13 15:34:51
  * @LastEditors: perli 1003914407@qq.com
- * @LastEditTime: 2023-03-28 10:21:03
- * @FilePath: /nest/admin-server/README.md
+ * @LastEditTime: 2023-04-03 16:25:54
+ * @FilePath: /nest/README.md
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
 -->
 
@@ -807,3 +807,339 @@ export class User extends Common {
 ```
 
 
+### 利用RBAC模型实现权限管理
+
+
+>RBAC 模型是一种基于角色的访问控制模型，它将权限分配给角色，然后将角色分配给用户。用户通过角色来获得权限，而不是直接获得权限。这样可以减少用户权限的管理，提高权限的复用性。
+
+
+1. 先创建 role的 entity 实体文件
+
+```ts
+import { Column, Entity, ObjectIdColumn } from "typeorm"
+
+@Entity()
+export class Role extends Common {
+
+  @Column("text")
+  name: string
+  @Column("")
+  permissions: object
+}
+```
+
+2. 补充user.entity.ts 实体中的字段
+
+```ts
+import {
+  Entity,
+  Column,
+  Unique,
+  UpdateDateColumn,
+  ObjectIdColumn,
+  CreateDateColumn,
+  ManyToMany,
+  JoinTable,
+  OneToOne,
+} from 'typeorm';
+import { ObjectId } from 'mongoose'; //引入mongoose的ObjectId类型
+import { Common } from '../../shared/entities/common.entity';
+
+@Entity()
+export class User extends Common {
+  // 昵称
+  @Column('text')
+  name: string;
+
+  @Column('text')
+  avatar: string;
+
+  // @Unique('email', ['email'])
+  @Column({ length: 200 })
+  email: string;
+
+  // 手机号
+  @Column('text')
+  phoneNumber: string;
+
+  @Column()
+  password: string;
+
+  @Column()
+  role?: ObjectId; // 角色 id 为什么不用string类型 因为在mongodb中的id是ObjectId类型所以这里也用ObjectId类型 也可以用string类型但是需要在创建的时候转换为ObjectId类型
+
+  @Column()
+  job: string;
+
+  @Column()
+  jobName: string;
+
+  @Column()
+  organization: string;
+
+  @Column()
+  organizationName: string;
+
+  @Column()
+  location: string;
+
+  @Column()
+  locationName: string;
+
+  @Column()
+  introduction: string;
+
+  @Column()
+  personalWebsite: string;
+
+  @Column('boolean')
+  verified: boolean;
+
+  // 加密盐
+  @Column({
+    type: 'text',
+    select: false,
+  })
+  salt: string;
+
+  @Column()
+  isAccountDisabled?: boolean;
+}
+
+```
+
+
+3. 创建role.service.ts
+
+```ts
+import { Inject, Injectable } from '@nestjs/common';
+import { CreateUserDto } from '../dtos/create-user.dto';
+import { UpdateUserDto } from '../dtos/update-user.dto';
+import { SystemService } from '../../shared/system.service';
+import { MongoRepository } from 'typeorm';
+import { User } from '../entities/user.mongo.entity';
+import { AppLogger } from 'src/shared/logger/logger.service';
+import { PaginationParamsDto } from '../../shared/dtos/pagination-params.dto';
+
+
+@Injectable()
+export class UserService {
+  constructor(private readonly systemService: SystemService,
+    @Inject('USER_REPOSITORY')
+    private readonly userRepository: MongoRepository<User>,
+    private readonly logger: AppLogger
+  ) {
+    this.logger.setContext(UserService.name)
+  }
+
+  create(createUserDto: CreateUserDto) {
+    // 调用Modle
+    // return 'This action adds a 🚀 new user';
+    return this.userRepository.save(createUserDto)
+  }
+
+  async findAll({ pageSize, page }: PaginationParamsDto): Promise<{ data: User[], count: number }> {
+
+    const [data, count] = await this.userRepository.findAndCount({
+      order: { name: 'DESC' },
+      skip: (page - 1) * pageSize,
+      take: (pageSize * 1),
+      cache: true
+    })
+
+    // 100 => 第二页 5 6-10
+    return {
+      data, count
+    }
+  }
+
+  async findOne(id: string) {
+    return await this.userRepository.findOneBy(id)
+
+  }
+
+  async update(id: string, user: CreateUserDto) {
+    return await this.userRepository.update(id, user)
+  }
+
+  async remove(id: string): Promise<any> {
+    return await this.userRepository.delete(id)
+  }
+}
+```
+
+4. 在 user.providers.ts 中添加  
+
+```ts
+import {  Role } from './entities/role.mongo.entity';
+
+export const UserProvider = [
+  {
+    provide:"ROLE_REPOSITORY",
+    useFactory: async (connection: Connection) => await connection.getRepository(Role),
+    inject: ['MONGODB_DATA_SOURCE']
+  }
+]
+```
+
+5. 创建 公共的 Response.dto 文件
+   - 在 shared/dots 创建 base-api-response.dto.ts
+  ```ts
+  import {ApiProperty, ApiPropertyOptional} from "@nestjs/swagger";
+  //ApiProperty 用于描述属性
+  //ApiPropertyOptional 用于描述可选属性
+
+  export class BaseApiResponse<T> {
+    public data:T  //返回的数据 
+    @ApiProperty({type:Object})
+    public meta: any // 元数据
+  }
+  
+  export function SwaggerBaseApiResponse<T>(type:T): typeof  BaseApiResponse {
+    class ExtendedBaseApiResponse<T> extends BaseApiResponse<T> {
+      @ApiProperty({type}) // 用于描述属性
+      public data: T
+
+      const isAnArray = Array.isArray(type) ?  " [ ] " : " "
+      Object.defineProperty(ExtendedBaseApiResponse,"name",{
+        value:`SwaggerBaseApiResponseFor ${type} ${isAnArray}`
+      })
+    }
+    return ExtendedBaseApiResponse
+  }
+
+
+  export class BaseApiErrorObject {
+
+    @ApiProperty({type:Number})
+    public statusCode: number
+
+    @ApiProperty({type:String})
+    public message: string
+
+    @ApiPropertyOptional({type:String})
+    public LocalizedMessage: string
+
+    @ApiProperty({type:String})
+    public errorName: string
+
+    @ApiProperty({type:Object})
+    public details: unknown
+
+    @ApiProperty({ type: String })
+    public path: string;
+
+    @ApiProperty({ type: String })
+    public requestId: string;
+
+    @ApiProperty({ type: String })
+    public timestamp: string;
+
+  }
+
+  export class BaseApiErrorResponse {
+    @ApiProperty(type:BseApiErrorObject)
+    public error: BaseApiErrorObject
+  }
+  ```
+
+  6. 创建 role.controller.ts
+
+  ```ts
+  import { Body, Controller, Delete, Get, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
+
+  import { RoleService } from '../service/role.service';
+
+  import { CreateRoleDto } from '../dtos/create-role.dto';
+  @ApiTags('角色')
+  @Controller('role')
+  export class RoleController {
+    constructor(private readOnly roleService: RoleService ) {
+
+    }
+    @ApiOperation({summary:'创建角色'})
+    @ApiResponse({
+      status: HttpStatus.CREATED,
+      type:SwaggerBaseApiResponse(CreateRoleDto)
+    })
+    @ApiResponse({
+      status:HttpStatus.NOT_FOUND,
+      type:BaseApiErrorResponse
+    })
+    @post("")
+
+    create(@Body() Role:CreateRoleDto) {
+      return this.roleService.create(Role)
+    } 
+    @ApiOperation({
+    summary: '查找所有角色',
+    })
+    @ApiResponse({
+      status: HttpStatus.OK,
+      type: SwaggerBaseApiResponse([CreateRoleDto]),
+    })
+    @ApiResponse({
+      status: HttpStatus.NOT_FOUND,
+      type: BaseApiErrorResponse,
+    })
+    @Get()
+    async findAll(
+      @Query() query: PaginationParamsDto
+    ) {
+      // console.log(query)
+      const { data, count } = await this.RoleService.findAll(query);
+      return {
+        data,
+        meta: { total: count }
+      }
+    }
+    @ApiOperation({
+      summary: '查找单个角色',
+    })
+    @ApiResponse({
+      status: HttpStatus.OK,
+      type: SwaggerBaseApiResponse(CreateRoleDto),
+    })
+    @ApiResponse({
+      status: HttpStatus.NOT_FOUND,
+      type: BaseApiErrorResponse,
+    })
+    @Get(':id')
+    async findOne(@Param('id') id: string) {
+      return {
+        data: await this.RoleService.findOne(id)
+      }
+    }
+
+    @ApiOperation({
+      summary: '更新单个角色',
+    })
+    @ApiResponse({
+      status: HttpStatus.OK,
+      type: SwaggerBaseApiResponse(CreateRoleDto),
+    })
+    @ApiResponse({
+      status: HttpStatus.NOT_FOUND,
+      type: BaseApiErrorResponse,
+    })
+    @Patch(':id')
+    async update(@Param('id') id: string, @Body() updateCourseDto: CreateRoleDto) {
+      return {
+        data: await this.RoleService.update(id, updateCourseDto)
+      }
+    }
+
+    @ApiBearerAuth()
+    @ApiOperation({
+      summary: '删除单个角色',
+    })
+    @ApiResponse({
+      status: HttpStatus.NO_CONTENT,
+    })
+    @ApiBearerAuth()
+    @Delete(':id')
+    remove(@Param('id') id: string) {
+      return this.RoleService.remove(id);
+    }
+
+  }

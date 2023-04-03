@@ -8,8 +8,8 @@ import {
   ManyToMany,
   JoinTable,
   OneToOne,
-  ObjectID,
 } from 'typeorm';
+import { ObjectId } from 'mongoose';
 import { Common } from '../../shared/entities/common.entity';
 
 @Entity()
@@ -33,7 +33,7 @@ export class User extends Common {
   password: string;
 
   @Column()
-  role?: ObjectID;
+  role?: ObjectId;
 
   @Column()
   job: string;

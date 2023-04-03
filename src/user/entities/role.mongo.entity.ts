@@ -1,16 +1,4 @@
-import {
-  PrimaryGeneratedColumn,
-  Entity,
-  Column,
-  Unique,
-  UpdateDateColumn,
-  ObjectIdColumn,
-  CreateDateColumn,
-  ManyToMany,
-  ObjectID,
-  JoinTable,
-} from 'typeorm';
-import { User } from './user.mongo.entity';
+import { Entity, Column } from 'typeorm';
 import { Common } from 'src/shared/entities/common.entity';
 @Entity()
 export class Role extends Common {
