@@ -3,8 +3,8 @@ import { PaginationParamsDto } from './../../shared/dtos/pagination-params';
  * @Author: perli 1003914407@qq.com
  * @Date: 2023-03-16 10:51:51
  * @LastEditors: perli 1003914407@qq.com
- * @LastEditTime: 2023-03-30 15:26:47
- * @FilePath: /nest/admin-server/src/user/services/user.service.ts
+ * @LastEditTime: 2023-04-20 14:55:05
+ * @FilePath: /nest/src/user/services/user.service.ts
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
 import { SystemService } from '../../shared/system.service';
@@ -14,6 +14,8 @@ import { CreateUserDto } from '../dtos/create-user.dto';
 import { UpdateUserDto } from '../dtos/update-user.dto';
 import { MongoRepository } from 'typeorm';
 import { User } from '../entities/user.mongo.entity';
+import { encryptoPassword, makeSalt } from '@/shared/utils/cryptogram.util';
+import { UploadService } from '@/shared/upload/upload.service';
 @Injectable()
 export class UserService {
   constructor(
@@ -21,6 +23,7 @@ export class UserService {
     @Inject('USER_REPOSITORY')
     private readonly userRepository: MongoRepository<User>,
     private readonly logger: AppLoggerService,
+    private readonly uploadService: UploadService,
   ) {
     this.logger.setContext(UserService.name);
   }
@@ -33,10 +36,15 @@ export class UserService {
     //   user.salt = salt;
     //   user.password = hashPassword;
     // }
-    return this.userRepository.save({
-      name: 'haha',
-      email: '1@1.com',
-    });
+    if (user.password) {
+      const { salt, hashPassword } = this.getPassword(user.password);
+      user = {
+        ...user,
+        salt,
+        password: hashPassword,
+      };
+    }
+    return this.userRepository.save(user);
   }
   async findAll({
     pageSize,
@@ -62,10 +70,30 @@ export class UserService {
   }
 
   async update(id: string, user: CreateUserDto) {
+    if (user.password) {
+      const { salt, hashPassword } = this.getPassword(user.password);
+      user = {
+        ...user,
+        salt,
+        password: hashPassword,
+      };
+    }
     return this.userRepository.update(id, user);
   }
 
   async remove(id: string): Promise<any> {
     return await this.userRepository.delete(id);
+  }
+  getPassword(password: string) {
+    const salt = makeSalt();
+    const hashPassword = encryptoPassword(salt, password);
+    return {
+      salt,
+      hashPassword,
+    };
+  }
+  async uploadAvatar(file) {
+    const { url } = await this.uploadService.upload(file);
+    return { data: url };
   }
 }

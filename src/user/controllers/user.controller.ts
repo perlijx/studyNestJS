@@ -1,10 +1,15 @@
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiConsumes,
+} from '@nestjs/swagger';
 /*
  * @Author: perli 1003914407@qq.com
  * @Date: 2023-03-16 10:51:51
  * @LastEditors: perli 1003914407@qq.com
- * @LastEditTime: 2023-03-27 16:34:11
- * @FilePath: /nest/admin-server/src/user/controllers/user.controller.ts
+ * @LastEditTime: 2023-04-20 14:56:11
+ * @FilePath: /nest/src/user/controllers/user.controller.ts
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
 import {
@@ -17,12 +22,18 @@ import {
   Query,
   Delete,
   HttpStatus,
+  Req,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
 import { UserService } from '../services/user.service';
 import { CreateUserDto } from '../dtos/create-user.dto';
 import { UpdateUserDto } from '../dtos/update-user.dto';
 import { ConfigService } from '@nestjs/config';
 import { PaginationParamsDto } from '@/shared/dtos/pagination-params';
+import { UploadDTO } from '@/shared/dtos/upload.dto';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { enCryptoFileMD5 } from '@/shared/utils/cryptogram.util';
 
 @Controller('user')
 @ApiTags('用户中心')
@@ -84,5 +95,11 @@ export class UserController {
   @Delete(':id')
   async remove(@Param('id') id: string) {
     return this.userService.remove(id);
+  }
+  @Post('upload')
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(FileInterceptor('file'))
+  async upload(@Req() req, @Body() uploadDto: UploadDTO, @UploadedFile() file) {
+    return this.userService.uploadAvatar(file);
   }
 }
