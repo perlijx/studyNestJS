@@ -2,7 +2,7 @@
  * @Author: perli 1003914407@qq.com
  * @Date: 2023-03-13 15:34:51
  * @LastEditors: perli 1003914407@qq.com
- * @LastEditTime: 2023-04-20 15:03:56
+ * @LastEditTime: 2023-04-20 18:18:24
  * @FilePath: /nest/README.md
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
 -->
@@ -1463,4 +1463,145 @@ app.useStaticAssets(uploadDir, {
   prefix: '/static/upload', // 静态服务的前缀
 });
 ```
+
+### 实现JwtToken的签发sing
+
+1. 创建AuthController
+
+```ts
+@ApiTags("认证鉴权")
+@Controller("auth")
+export class AuthController {
+  @ApiOperation({ summary: "用户登录" }) // 接口描述
+  @ApiResponses({ 
+    status:HttpStatus.OK,
+    type:SwaggerBaseApiResponse(LoginDTO) // 接口返回值
+   }) // 接口返回值
+  @ApiResponses({ 
+    status:HttpStatus.NOT_FOUND, // 接口返回值
+    type:BaseApiErrorResponse
+   }) // 接口返回值 
+  @Post("login") 
+  login(@Body() loginDto: LoginDTO):Promise<any> {
+    
+  }
+}
+```
+
+2. 创建 LoginDTO
+
+```ts
+export class LoginDTO {
+ //Matches 是自定义的验证器,用来验证手机号码格式
+ @Matches(regMobileCN, { message: "手机号码格式不正确" }) // 验证手机号码格式
+ @IsNotEmpty({ message: "手机号码不能为空" }) // 验证手机号码不能为空
+ @ApiProperty({ description: "手机号码", example: "18888888888" }) // 接口参数描述
+ readonly phoneNumber: string;
+
+ @IsNotEmpty({ message: "密码不能为空" }) // 验证密码不能为空
+ @ApiProperty({ description: "密码", example: "123456" }) // 接口参数描述
+ readonly password: string;
+}
+```
+
+
+
+3. 创建 auth.service.ts 
+
+安装 JwtService
+
+```zsh
+pnpm i @nestjs/jwt
+```
+
+```ts
+@injectable() // 依赖注入
+export class AuthService {
+  constructor(
+    private readonly jwtService: JwtService, // 注入jwtService
+    @Inject("USER_REPOSITORY") private readonly userRepository: MongoRepository<User>, // 注入UserRepository
+  )
+  //签发token
+  async login(loginDto: LoginDTO) {
+    const user = await this.checkLoginForm(loginDto) // 验证用户登录
+    const token = await this.certificate(user) // 签发token
+    return {
+      data: {
+        token
+      }
+    }
+  }
+  async checkLoginForm(loginDto:LoginDTO) {
+    const {phoneNumber, password} = loginDto
+    const user = await this.userRepository.finOneBy({phoneNumber})
+    if(!user) {
+      //为什么使用NotFoundException 而不是 HttpException  因为NotFoundException 是继承HttpException的 他会自动的把status设置为404 HttpException需要手动设置status   
+      throw new NotFoundException("用户不存在") // 抛出异常
+    }
+    const {password: dbPassword,salt} = user
+    const hashPassword = enCryptoPassword(password, salt)
+    if(hashPassword !== dbPassword) {
+      throw new NotFoundException("密码错误")
+    }
+    return user
+  }
+  // 验证token
+  async certificate(user: User) {
+    const payload = {
+      id: user._id,
+    }
+    const token = this.jwtService.sign(payload) // 签发token
+    return token
+  }
+
+}
+```
+
+4. 在 UserModule 中导入 AuthService
+
+```ts
+@Module({
+  controllers: [UserController, RoleController],
+  providers: [UserService, RoleService, ...UserProviders,AuthService],
+  imports: [
+    SharedModule,
+    JwtModule.registerAsync({ // 注册jwt
+      inject:[ConfigService], // 注入ConfigService
+      imports:[SharedModule], // 导入共享模块
+      useFactory:(configService:ConfigService)=>(configService.get('jwt')) // 获取jwt的配置
+    })
+  ],
+})
+
+```
+
+5. 在 env 中配置 jwt
+
+```zsh
+JWT_SECRET=123456  //jwt的密钥
+JWT_EXPIRES_IN=3600 //jwt的过期时间
+```
+
+6. 在 configration.ts 中配置 jwt
+
+```ts
+
+export default (): any => ({
+  env: process.env.APP_ENV,
+  port: process.env.APP_PORT,
+  database: {
+    url: process.env.DB_URL,
+    name: process.env.DB_NAME,
+    user: process.env.DB_USER,
+    pass: process.env.DB_PASS,
+    synchronize: process.env.DB_SYNCHRONIZE,
+    logging: process.env.DB_LOGGING,
+  },
+  jwt: {
+    secret: process.env.JWT_SECRET,
+    signOptions: { // jwtsign的配置
+      expiresIn: process.env.JWT_EXPIRES_IN,
+    },
+  },
+});
 ```
