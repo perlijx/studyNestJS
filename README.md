@@ -2,7 +2,7 @@
  * @Author: perli 1003914407@qq.com
  * @Date: 2023-03-13 15:34:51
  * @LastEditors: perli 1003914407@qq.com
- * @LastEditTime: 2023-05-17 15:00:12
+ * @LastEditTime: 2023-05-18 15:08:27
  * @FilePath: /nest/README.md
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
 -->
@@ -1856,3 +1856,37 @@ providers:[JwtStrategy]
 ```
 
 
+### 使用拦截器实现全局敏感信息清理
+
+1. 在shared文件夹中创建interceptors文件夹，创建remove-sensitive-info.interceptor.ts
+
+
+```ts
+@Injectable()
+export class RemoveSensitiveUserInfoInterceptor implements NestInterceptor {
+  intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+    return next.handle().pipe(map(res=>{
+      const delKeyList = ["password","salt"]
+      this.delValue(res,delKeyList)
+    }))
+  }
+  //删除敏感的key
+  delValue(data, delKeyList) {
+    for(let key in data) {
+      if(delKeyList.includes[key]) {
+        delete data[key]
+      } else if(typeof data[key] === 'object') {
+        this.delValue(data[key], delKeyList)
+      }
+    }
+  }
+}
+
+```
+   
+2. 在main.js 中 全局注册方法
+
+
+```ts
+app.useGlobalInterceptors(new REmoveSensitiveUserInfoInterceptor())
+```
