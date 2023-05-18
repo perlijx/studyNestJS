@@ -2,7 +2,7 @@
  * @Author: perli 1003914407@qq.com
  * @Date: 2023-03-13 15:34:51
  * @LastEditors: perli 1003914407@qq.com
- * @LastEditTime: 2023-04-20 18:18:24
+ * @LastEditTime: 2023-05-17 15:00:12
  * @FilePath: /nest/README.md
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
 -->
@@ -182,6 +182,7 @@ class Car {
   run() {
      console.log(`汽车是用${this.wheel.brand}牌子的轮子跑`)
   }
+
 }
 const container = new Container()
 container.provide("wheel", new Wheel("米其林"))
@@ -403,7 +404,7 @@ export default (): any => ({
     pass: process.env.DB_PASS,
     synchronize: process.env.DB_SYNCHRONIZE,
     logging: process.env.DB_LOGGING
-
+  }
 ```
 
 ### TypeORM 数据持久化
@@ -1605,3 +1606,253 @@ export default (): any => ({
   },
 });
 ```
+
+###  利用守卫校验token
+
+
+1. 在 AuthController 中创建 info 接口
+
+安装 @nestjs/passport
+
+```zsh
+pnpm i @nestjs/passport
+```
+
+```ts
+@ApiOperation({ summary: "获取用户信息" }) // 接口描述
+@ApiResponses({ 
+  status:HttpStatus.OK,
+  type:SwaggerBaseApiResponse(UserInfoDTO) // 接口返回值
+  }) // 接口返回值
+@ApiResponses({ 
+  status:HttpStatus.NOT_FOUND, // 接口返回值
+  type:BaseApiErrorResponse
+  }) //
+@ApiBearerAuth() // 开启token验证
+@UseGuards(AuthGuard('jwt')) // 使用守卫
+async info(@Req() req:any):Promise<any> {
+  const data = await this.authService.info(req.user.id)
+  delete data.password
+  delete data.salt
+  return {data}
+}
+```
+
+2. 创建 UserInfoDTO
+
+```ts
+import { SuccessVO } from "@/shared/dtos/success.dto";
+import { ApiProperty } from '@nestjs/swagger';
+import { IsNotEmpty, Matches, IsString } from 'class-validator';
+import { regMobileCN } from "@/shared/utils/regex.util";
+
+
+export class RegisterSMSDTO {
+
+  /**
+   * 手机号（系统唯一）
+   */
+  @Matches(regMobileCN, { message: '请输入正确手机号' })
+  @IsNotEmpty({ message: '请输入手机号' })
+  @ApiProperty({ example: '13611177420' })
+  readonly phoneNumber: string;
+
+  /**
+   * 短信验证码
+   */
+  @IsNotEmpty({ message: '请输入验证码' })
+  @ApiProperty({ example: '0000' })
+  readonly smsCode: string;
+
+
+  /**
+   * 图形验证码
+   */
+  @IsNotEmpty({ message: '请输入图形验证码' })
+  @ApiProperty({ example: '0000' })
+  readonly verifyCode: string;
+
+}
+
+export class RegisterCodeDTO {
+
+  /**
+   * 手机号（系统唯一）
+   */
+  @Matches(regMobileCN, { message: '请输入正确手机号' })
+  @IsNotEmpty({ message: '请输入手机号' })
+  @ApiProperty({ example: '13611177420' })
+  readonly phoneNumber: string;
+
+  @IsNotEmpty({ message: '请输入验证码ID' })
+  @ApiProperty({ example: 'GaBUGhJzESU=' })
+  readonly captchaId: string;
+
+  @IsNotEmpty({ message: '请输入手机号' })
+  @ApiProperty({ example: '0000' })
+  readonly captchaCode: string;
+
+}
+
+export class RegisterDTO {
+  /**
+   * 手机号，唯一
+   */
+  @Matches(regMobileCN, { message: '请输入正确手机号' })
+  @IsNotEmpty({ message: '请输入手机号' })
+  @ApiProperty({ example: '13611177421' })
+  readonly phoneNumber: string;
+
+  /**
+   * 用户名
+   */
+  @IsNotEmpty({ message: '请输入用户昵称' })
+  @IsString({ message: '名字必须是 String 类型' })
+  @ApiProperty({ example: "然叔" })
+  readonly name: string;
+
+  /**
+   * 用户密码
+   */
+  @IsNotEmpty({ message: '请输入密码' })
+  @ApiProperty({ example: '888888' })
+  readonly password: string;
+
+  /**
+   * 二次输入密码
+   */
+  @IsNotEmpty({ message: '请再次输入密码' })
+  @ApiProperty({ example: '888888' })
+  readonly passwordRepeat: string
+}
+
+export class UserInfoDto {
+
+  /**
+  * 手机号（系统唯一）
+  */
+  @Matches(regMobileCN, { message: '请输入正确手机号' })
+  @IsNotEmpty({ message: '请输入手机号' })
+  @ApiProperty({ example: '13611177421' })
+  readonly phoneNumber: string;
+
+  @ApiProperty({ example: '然叔' })
+  @IsNotEmpty()
+  name: string;
+
+  @ApiProperty({ example: '123456' })
+  @IsNotEmpty()
+  password: string;
+
+  @ApiProperty({ example: '15906475@qq.com' })
+  @IsNotEmpty()
+  email: string;
+
+  @ApiProperty({ example: 'cookieboty' })
+  @IsNotEmpty()
+  avatar: string;
+
+  @ApiProperty({ example: 'frontend' })
+  @IsNotEmpty()
+  job: string;
+
+  @ApiProperty({ example: '前端开发工程师' })
+  @IsNotEmpty()
+  jobName: string;
+
+  @ApiProperty({ example: 'cookieboty' })
+  @IsNotEmpty()
+  organization: string;
+
+  @ApiProperty({ example: 'beijing' })
+  @IsNotEmpty()
+  location: string;
+
+  @ApiProperty({ example: 'cookieboty' })
+  @IsNotEmpty()
+  personalWebsite: string;
+
+  @ApiProperty({ example: '{}' })
+  permissions?: object | []
+
+  salt?: string
+
+}
+
+export class RegisterCodeItem {
+  /**
+ * 手机号
+ */
+  mobile: string;
+}
+
+export class UserInfoItem {
+  /**
+   * 用户id
+   */
+  id: number;
+
+  /**
+   * 创建时间
+   */
+  createTime: Date
+
+  /**
+   * 更新时间
+   */
+  updateTime: Date
+
+  /**
+   * 手机号
+   */
+  mobile: string;
+}
+
+export class UserInfoVO {
+  info: UserInfoItem
+}
+
+export class UserInfoSuccessVO extends SuccessVO {
+  data: UserInfoVO
+}
+```
+  
+
+3. 创建 strategies/jwt.strategy.ts
+
+```ts
+//JWT 策略
+//passport-jwt 是一个验证jwt的策略
+//passport 是一个验证策略的框架
+//ExtractJwt 用来提取token
+//Strategy 是一个验证策略
+import  {ExtractJwt, Strategy} from 'passport-jwt' // 导入jwt的策略
+//PassportStrategy 是一个验证策略的抽象类
+import { PassportStrategy } from '@nestjs/passport' // 导入passport的策略
+import { Injectable, UnauthorizedException } from '@nestjs/common' // 导入nest的依赖
+
+@Injectable()
+export class JwtStrategy extends PassportStrategy(Strategy) {
+  constructor(
+    
+  ) {
+    super({
+      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(), // 从请求头中提取token
+      ignoreExpiration: false, // 忽略过期时间
+      secretOrKey: process.env.JWT_SECRET, // 验证token的密钥
+    })
+  }
+  async validate(payload: any) { // 验证token
+    return { id: payload.id }
+  }
+}
+
+```
+
+4. 在 user.module.ts 中导入 JwtStrategy
+
+```ts
+providers:[JwtStrategy]
+```
+
+
